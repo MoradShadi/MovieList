@@ -1,0 +1,6 @@
+# config.yaml
+DB:
+  User: morad
+  Password: password
+  Name: movie_watchlist_db
+  Host: db
