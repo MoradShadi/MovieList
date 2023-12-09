@@ -1,15 +1,16 @@
-version: '3'
+version: '3.8'
 
 services:
   backend:
     image: backend
-    depends_on:
-      db:
-        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
-      DATABASE_URL: postgres://morad:password@db:5432/movie_watchlist_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=movie_watchlist_db
+      - DATABASE_HOST=postgresdb
+      - DATABASE_PORT=5432
     networks:
       - mynetwork
 
@@ -20,19 +21,15 @@ services:
     networks:
       - mynetwork
 
-  db:
+  postgresdb:
     image: postgres:latest
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready", "-q", "-d", "movie_watchlist_db"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_USER: morad
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: movie_watchlist_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=movie_watchlist_db
+      - DATABASE_HOST=postgresdb
     networks:
       - mynetwork
 

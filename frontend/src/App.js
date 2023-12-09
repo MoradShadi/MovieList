@@ -15,7 +15,7 @@ const App = () => {
   // Function to fetch the list of movies from the backend
   const fetchMovies = async () => {
     try {
-      const response = await fetch('http://backend:8080/movies');
+      const response = await fetch('https://sturdy-doodle-vrgrv655qvp379v-3000.app.github.dev/movies');
       const data = await response.json();
       setMovies(data);
     } catch (error) {
@@ -26,7 +26,7 @@ const App = () => {
   // Function to add a new movie to the backend
   const addMovie = async (newMovie) => {
     try {
-      const response = await fetch('http://backend:8080/movies', {
+      const response = await fetch('https://sturdy-doodle-vrgrv655qvp379v-3000.app.github.dev/movies', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,31 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
 	"log"
 	"net/http"
-	"os"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	"gopkg.in/yaml.v2"
+	"github.com/gorilla/mux"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-type DBConfig struct {
-	User     string `yaml:"User"`
-	Password string `yaml:"Password"`
-	Name     string `yaml:"Name"`
-	Host     string `yaml:"Host"`
-}
-
-type Config struct {
-	DB DBConfig `yaml:"DB"`
-}
-
 var db *gorm.DB
-var config Config
 
 type Movie struct {
 	gorm.Model
@@ -34,21 +20,25 @@ type Movie struct {
 	Watched     bool   `json:"watched"`
 }
 
+func enableCors(w *http.ResponseWriter) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+}
+
+func getDatabaseURL() string {
+
+	return fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		"postgresdb", "user", "password", "movie_watchlist_db", "5432",
+	)
+}
+
 func main() {
-	loadConfig()
 
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL environment variable not set")
+	db, err := gorm.Open(postgres.Open(getDatabaseURL()), &gorm.Config{})
+	if err == nil {
+		fmt.Println("Connected to the PostgreSQL database!")
 	}
 
-	// Open a connection to the PostgreSQL database using GORM
-	db, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Automatically create the 'movies' table based on the 'Movie' struct
 	err = db.AutoMigrate(&Movie{})
 	if err != nil {
 		log.Fatal(err)
@@ -56,99 +46,88 @@ func main() {
 
 	fmt.Println("Connected to the PostgreSQL database!")
 
-	r := gin.Default()
+	r := mux.NewRouter()
+	r.HandleFunc("/movies", getMovies).Methods("GET")
+	r.HandleFunc("/movies", createMovie).Methods("POST")
+	r.HandleFunc("/movies/{id}", getMovie).Methods("GET")
+	r.HandleFunc("/movies/{id}", updateMovie).Methods("PUT")
+	r.HandleFunc("/movies/{id}", deleteMovie).Methods("DELETE")
 
-	// Use CORS middleware
-	r.Use(cors.Default())
-
-	// Define routes
-	r.GET("/movies", getMovies)
-	r.POST("/movies", createMovie)
-	r.GET("/movies/:id", getMovie)
-	r.PUT("/movies/:id", updateMovie)
-	r.DELETE("/movies/:id", deleteMovie)
-
-	// Start the server
 	fmt.Println("Server is running on :8080")
-	log.Fatal(r.Run(":8080"))
+	log.Fatal(http.ListenAndServe(":8080", r))
+
 }
 
-func loadConfig() {
-	file, err := os.Open("config.yaml")
-	if err != nil {
-		fmt.Println("No configuration file found, using default values.")
-		return
-	}
-	defer file.Close()
+func getMovies(w http.ResponseWriter, r *http.Request) {
 
-	decoder := yaml.NewDecoder(file)
-	err = decoder.Decode(&config)
-	if err != nil {
-		log.Fatalf("Error decoding configuration: %v", err)
-	}
-}
-
-func getMovies(c *gin.Context) {
+	enableCors(&w)
+	log.Println("GET /movies endpoint is hit")
 	var movies []Movie
 	db.Find(&movies)
 
-	c.JSON(http.StatusOK, movies)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(movies)
 }
 
-func createMovie(c *gin.Context) {
+func createMovie(w http.ResponseWriter, r *http.Request) {
+
+	enableCors(&w)
+	log.Println("GET /movies endpoint is hit")
 	var movie Movie
-	if err := c.ShouldBindJSON(&movie); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	json.NewDecoder(r.Body).Decode(&movie)
 
 	fmt.Println(movie.Title)
 	db.Create(&movie)
 
-	c.JSON(http.StatusCreated, movie)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(movie)
 }
 
-func getMovie(c *gin.Context) {
+func getMovie(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+	params := mux.Vars(r)
 	var movie Movie
-	result := db.First(&movie, c.Param("id"))
+	result := db.First(&movie, params["id"])
 
 	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Movie not found"})
+		http.NotFound(w, r)
 		return
 	}
 
-	c.JSON(http.StatusOK, movie)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(movie)
 }
 
-func updateMovie(c *gin.Context) {
+func updateMovie(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+	params := mux.Vars(r)
 	var movie Movie
-	result := db.First(&movie, c.Param("id"))
+	result := db.First(&movie, params["id"])
 
 	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Movie not found"})
+		http.NotFound(w, r)
 		return
 	}
 
-	if err := c.ShouldBindJSON(&movie); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
+	json.NewDecoder(r.Body).Decode(&movie)
 	db.Save(&movie)
 
-	c.JSON(http.StatusOK, movie)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(movie)
 }
 
-func deleteMovie(c *gin.Context) {
+func deleteMovie(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+	params := mux.Vars(r)
 	var movie Movie
-	result := db.First(&movie, c.Param("id"))
+	result := db.First(&movie, params["id"])
 
 	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Movie not found"})
+		http.NotFound(w, r)
 		return
 	}
 
 	db.Delete(&movie)
 
-	c.Status(http.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
 }
