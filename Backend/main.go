@@ -28,7 +28,7 @@ func getDatabaseURL() string {
 
 	return fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		"postgresdb", "user", "password", "movie_watchlist_db", "5432",
+		"localhost", "user", "password", "movie_watchlist_db", "5432",
 	)
 }
 
@@ -56,6 +56,17 @@ func main() {
 	fmt.Println("Server is running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", r))
 
+	
+
+	/*http.HandleFunc("/movies", getMovies)
+
+	port := 8080
+	fmt.Printf("Server is running on port %d...\n", port)
+	err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	if err != nil {
+		fmt.Println("Error:", err)
+	}*/
+
 }
 
 func getMovies(w http.ResponseWriter, r *http.Request) {
@@ -63,16 +74,26 @@ func getMovies(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
 	log.Println("GET /movies endpoint is hit")
 	var movies []Movie
+	log.Println("var ok")
+
+	db, err := gorm.Open(postgres.Open(getDatabaseURL()), &gorm.Config{})
+	if err == nil {
+		fmt.Println("Connected to the PostgreSQL database!")
+	}
+
 	db.Find(&movies)
+	log.Println("db find ok")
 
 	w.Header().Set("Content-Type", "application/json")
+	log.Println("header ok")
 	json.NewEncoder(w).Encode(movies)
+	log.Println("encoding ok")
 }
 
 func createMovie(w http.ResponseWriter, r *http.Request) {
 
 	enableCors(&w)
-	log.Println("GET /movies endpoint is hit")
+	log.Println("CREATE /movies endpoint is hit")
 	var movie Movie
 	json.NewDecoder(r.Body).Decode(&movie)
 
